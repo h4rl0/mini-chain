@@ -1,0 +1,13 @@
+#Virtual Environment
+.venv/
+
+#Postman    
+.postman/
+postman/
+
+#Check Setup
+check_setup.py
+
+# Python temporary files
+__pycache__/
+*.pyc
