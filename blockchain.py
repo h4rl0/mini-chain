@@ -102,6 +102,7 @@ class Blockchain:
 
 
 app = Flask(__name__)
+from flask_cors import CORS; CORS(app)
 node_id = uuid4().hex
 blockchain = Blockchain()
 

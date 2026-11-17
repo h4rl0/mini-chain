@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mini Chain
+</title>
+<style>
+  :root {
+    --bg: #0a0d14;
+    --panel: #121723;
+    --panel-2: #181f2f;
+    --line: #243049;
+    --text: #e6ebf5;
+    --muted: #7d8aa5;
+    --accent: #5eead4;
+    --accent-2: #818cf8;
+    --good: #34d399;
+    --bad: #f87171;
+    --warn: #fbbf24;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background:
+      radial-gradient(900px 500px at 10% -10%, rgba(129,140,248,.14), transparent 60%),
+      radial-gradient(800px 500px at 100% 0%, rgba(94,234,212,.10), transparent 60%),
+      var(--bg);
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    padding: 22px 32px; border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    display: grid; place-items: center; color: #08111a; font-weight: 800;
+  }
+  h1 { font-size: 20px; margin: 0; letter-spacing: .3px; }
+  .sub { color: var(--muted); font-size: 12px; font-family: var(--mono); }
+  .status {
+    display: flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px;
+    background: var(--panel); border: 1px solid var(--line); font-size: 13px;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--good); box-shadow: 0 0 10px var(--good); }
+  .status.bad .dot { background: var(--bad); box-shadow: 0 0 10px var(--bad); }
+
+  main { padding: 24px 32px 60px; max-width: 1500px; margin: 0 auto; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; }
+  .stat .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+  .stat .v { font-size: 26px; font-weight: 700; margin-top: 2px; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; }
+  .card h2 { margin: 0 0 14px; font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); font-weight: 600; }
+  .card h2 .count { color: var(--accent); margin-left: 6px; }
+
+  /* ---------- chain ---------- */
+  .chain-wrap { margin-bottom: 24px; }
+  .chain-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 10px; }
+  .chain-head h2 { margin: 0; }
+  .chain {
+    display: flex; align-items: center; overflow-x: auto; padding: 26px 6px 22px;
+    scroll-behavior: smooth;
+  }
+  .chain::-webkit-scrollbar { height: 8px; }
+  .chain::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; }
+  .link {
+    flex: 0 0 46px; height: 3px; position: relative;
+    background: repeating-linear-gradient(90deg, var(--accent-2) 0 6px, transparent 6px 10px);
+    animation: flow 1s linear infinite;
+  }
+  .link::after {
+    content: ""; position: absolute; right: -2px; top: -4px; border-left: 8px solid var(--accent-2);
+    border-top: 5.5px solid transparent; border-bottom: 5.5px solid transparent;
+  }
+  .link.broken { background: repeating-linear-gradient(90deg, var(--bad) 0 3px, transparent 3px 9px); animation: none; }
+  .link.broken::after { border-left-color: var(--bad); }
+  @keyframes flow { to { background-position: 10px 0; } }
+
+  .block {
+    flex: 0 0 190px; position: relative; cursor: pointer; border-radius: 14px; padding: 12px 14px;
+    background: linear-gradient(160deg, var(--panel-2), #131a29);
+    border: 1px solid var(--line); transition: transform .18s, box-shadow .18s, border-color .18s;
+  }
+  .block:hover { transform: translateY(-6px); border-color: var(--accent); box-shadow: 0 14px 30px rgba(94,234,212,.12); }
+  .block.selected { border-color: var(--accent-2); box-shadow: 0 0 0 2px rgba(129,140,248,.35); }
+  .block.invalid { border-color: var(--bad); background: linear-gradient(160deg, #2a1519, #1a1017); }
+  .block.invalid:hover { box-shadow: 0 14px 30px rgba(248,113,113,.18); border-color: var(--bad); }
+  .block.new { animation: pop .7s ease-out; }
+  @keyframes pop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.06); } 100% { transform: scale(1); opacity: 1; } }
+  .block .num { font-weight: 800; font-size: 18px; display: flex; justify-content: space-between; align-items: center; }
+  .badge { font-size: 10px; padding: 2px 8px; border-radius: 999px; font-weight: 600; letter-spacing: .5px; }
+  .badge.ok { background: rgba(52,211,153,.14); color: var(--good); }
+  .badge.no { background: rgba(248,113,113,.16); color: var(--bad); }
+  .block .row { margin-top: 8px; font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; }
+  .block .row b { color: var(--text); font-weight: 500; font-family: var(--mono); }
+  .hashbar { margin-top: 10px; height: 6px; border-radius: 6px; }
+  .block .short { margin-top: 6px; font-family: var(--mono); font-size: 11px; color: var(--accent); }
+
+  /* ---------- tooltip ---------- */
+  #tip {
+    position: fixed; z-index: 50; pointer-events: none; opacity: 0; transition: opacity .12s;
+    max-width: 380px; background: #0c111c; border: 1px solid var(--accent); border-radius: 12px;
+    padding: 12px 14px; box-shadow: 0 18px 40px rgba(0,0,0,.55); font-size: 12px;
+  }
+  #tip.show { opacity: 1; }
+  #tip .t { font-weight: 700; margin-bottom: 6px; }
+  #tip .l { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-top: 8px; }
+  #tip .h { font-family: var(--mono); word-break: break-all; line-height: 1.35; }
+  #tip .h .z { color: var(--good); font-weight: 700; }
+
+  /* ---------- grid ---------- */
+  .grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 18px; }
+  @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } header, main { padding-left: 16px; padding-right: 16px; } }
+  .stack { display: flex; flex-direction: column; gap: 18px; }
+
+  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  input, select {
+    width: 100%; background: #0c111c; color: var(--text); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; font: inherit; outline: none; transition: border-color .15s;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btns { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  button {
+    font: inherit; font-weight: 600; border: 0; cursor: pointer; border-radius: 10px; padding: 10px 16px;
+    color: #08111a; background: linear-gradient(135deg, var(--accent), #38bdf8); transition: filter .15s, transform .1s;
+  }
+  button:hover { filter: brightness(1.1); }
+  button:active { transform: scale(.97); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  button.ghost:hover { border-color: var(--accent); }
+  button.danger { background: linear-gradient(135deg, #f87171, #fb923c); }
+  button.mine { background: linear-gradient(135deg, var(--accent-2), var(--accent)); width: 100%; padding: 14px; font-size: 16px; }
+  .spin { display: inline-block; width: 13px; height: 13px; border: 2px solid #08111a55; border-top-color: #08111a; border-radius: 50%; animation: rot .7s linear infinite; vertical-align: -2px; margin-right: 8px; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+
+  .tx { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
+  .tx:last-child { border-bottom: 0; }
+  .tx .who { font-family: var(--mono); color: var(--muted); }
+  .tx .amt { color: var(--accent); font-weight: 700; white-space: nowrap; }
+  .empty { color: var(--muted); font-size: 13px; padding: 6px 0; }
+
+  .bal { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 13px; }
+  .bal .name { font-family: var(--mono); display: flex; gap: 8px; align-items: center; }
+  .me-tag { font-size: 10px; background: rgba(129,140,248,.2); color: var(--accent-2); padding: 1px 7px; border-radius: 999px; }
+  .bar { height: 5px; background: var(--line); border-radius: 5px; margin-top: 4px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent-2), var(--accent)); }
+
+  .detail pre {
+    margin: 0; background: #0c111c; border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+    font: 12px/1.5 var(--mono); overflow: auto; max-height: 300px; color: #c7d2ee;
+  }
+  .kv { display: grid; grid-template-columns: 110px 1fr; gap: 6px 10px; font-size: 13px; margin-bottom: 12px; }
+  .kv .k { color: var(--muted); }
+  .kv .v { font-family: var(--mono); word-break: break-all; }
+  .kv .v.copy { cursor: pointer; }
+  .kv .v.copy:hover { color: var(--accent); }
+
+  .nodes li { font-family: var(--mono); font-size: 13px; padding: 4px 0; color: var(--muted); }
+  ul { list-style: none; padding: 0; margin: 12px 0 0; }
+
+  #toasts { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 60; }
+  .toast {
+    background: var(--panel-2); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+    border-radius: 10px; padding: 11px 16px; font-size: 13px; max-width: 340px; animation: slide .25s ease-out;
+  }
+  .toast.err { border-left-color: var(--bad); }
+  @keyframes slide { from { transform: translateX(30px); opacity: 0; } }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .cfg { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .cfg input { width: 220px; padding: 7px 10px; font-size: 13px; font-family: var(--mono); }
+  .cfg input.d { width: 64px; }
+  .cfg span { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">⛓</div>
+    <div>
+      <h1>Chainlab</h1>
+      <div class="sub" id="nodeid">standalone</div>
+    </div>
+  </div>
+  <div class="cfg">
+    <span>Node</span><input id="cfgNode" spellcheck="false">
+    <span>Difficulty</span><input id="cfgDiff" class="d" type="number" min="1" max="8">
+  </div>
+  <div class="status" id="status"><span class="dot"></span><span id="statusText">Connecting…</span></div>
+</header>
+
+<main>
+  <section class="stats">
+    <div class="stat"><div class="k">Blocks</div><div class="v" id="sBlocks">–</div></div>
+    <div class="stat"><div class="k">Pending tx</div><div class="v" id="sPending">–</div></div>
+    <div class="stat"><div class="k">Difficulty</div><div class="v" id="sDiff">–</div></div>
+    <div class="stat"><div class="k">Peers</div><div class="v" id="sPeers">–</div></div>
+    <div class="stat"><div class="k">Last mine time</div><div class="v" id="sTime">–</div></div>
+  </section>
+
+  <section class="card chain-wrap">
+    <div class="chain-head">
+      <h2>The chain <span class="count" id="chainCount"></span></h2>
+      <div class="btns" style="margin:0">
+        <button class="ghost" id="jumpEnd">Jump to latest →</button>
+      </div>
+    </div>
+    <div id="simBanner" style="display:none;margin:8px 0 0;padding:8px 12px;border-radius:10px;background:rgba(251,191,36,.12);color:var(--warn);font-size:13px;align-items:center;gap:8px">⚠ Simulation view: this is a modified copy. Your real chain is untouched. <button class="ghost" id="exitSim" style="margin-left:auto;padding:5px 12px">Exit simulation</button></div>
+    <div class="chain" id="chain"></div>
+    <div class="hint">Hover a block to see its hash. Click to inspect it. Click a hash in the inspector to copy it.</div>
+  </section>
+
+  <div class="grid">
+    <div class="stack">
+      <div class="card">
+        <h2>Mine</h2>
+        <button class="mine" id="mineBtn">⛏ Mine a new block</button>
+        <div class="hint">Finds a nonce so the block hash starts with <span id="zeros" style="font-family:var(--mono);color:var(--good)"></span>. Pending transactions are sealed in, and you earn 1 coin.</div>
+      </div>
+
+      <div class="card">
+        <h2>New transaction</h2>
+        <form id="txForm">
+          <div class="two">
+            <div><label>Sender</label><input id="txSender" placeholder="alice" autocomplete="off"></div>
+            <div><label>Recipient</label><input id="txRecipient" placeholder="bob" autocomplete="off"></div>
+          </div>
+          <label>Amount</label>
+          <input id="txAmount" type="number" min="0" step="any" placeholder="1.5">
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input id="txEnforce" type="checkbox" checked style="width:auto"> Require sender to have enough balance</label>
+          <div class="btns">
+            <button type="submit">Send</button>
+            <button type="button" class="ghost" id="useMe">Send from this node</button>
+          </div>
+          <div class="hint">Coins only exist from mining rewards, so mine first, then use "Send from this node".</div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Waiting for next block <span class="count" id="pendCount"></span></h2>
+        <div id="pending"></div>
+      </div>
+    </div>
+
+    <div class="stack">
+      <div class="card detail">
+        <h2>Block inspector</h2>
+        <div id="detail"><div class="empty">Click a block in the chain.</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Balances</h2>
+        <div id="balances"></div>
+      </div>
+
+      <div class="card">
+        <h2>Network</h2>
+        <form id="nodeForm" style="display:flex;gap:10px">
+          <input id="nodeUrl" placeholder="http://127.0.0.1:5001" autocomplete="off">
+          <button type="submit" style="white-space:nowrap">Add peer</button>
+        </form>
+        <ul class="nodes" id="nodes"></ul>
+        <div class="btns"><button class="ghost" id="resolveBtn">Resolve conflicts</button></div>
+        <div class="hint">Run a second node on another port, mine there, add it as a peer, then resolve: the longest valid chain wins. Peers listed are those added from this page.</div>
+      </div>
+
+      <div class="card">
+        <h2>Tamper simulator</h2>
+        <div class="two">
+          <select id="tamperSel"></select>
+          <button class="danger" id="tamperBtn">Simulate</button>
+        </div>
+        <div class="hint">Edits a <b>copy</b> of the chain in memory to show how one change breaks every later link. Your real node is never modified.</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="tip"></div>
+<div id="toasts"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let state = null, sim = null, selected = null, knownCount = 0, lastMineTime = null, mining = false;
+const blocksNow = () => sim ? sim.blocks : state.blocks;
+
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+const cfg = { node: LS.get("node", "http://127.0.0.1:5000"), difficulty: +LS.get("difficulty", 4) || 4 };
+let submitted = [];          // transactions sent from this page that are not mined yet
+const peers = new Set();     // peers added from this page
+
+const short = (h, n = 8) => h.length > 12 ? h.slice(0, n) + "…" + h.slice(-4) : h;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtTime = t => t === 0 ? "genesis" : new Date(t * 1000).toLocaleTimeString();
+const colorOf = h => `hsl(${parseInt(h.slice(0, 4), 16) % 360} 75% 60%)`;
+const fmtAmt = n => Number.isInteger(n) ? n : +n.toFixed(4);
+
+function toast(msg, err = false) {
+  const t = document.createElement("div");
+  t.className = "toast" + (err ? " err" : "");
+  t.textContent = msg;
+  $("toasts").appendChild(t);
+  setTimeout(() => t.remove(), 4500);
+}
+
+/* ---------- reproduce Python's json.dumps(block, sort_keys=True) exactly ---------- */
+class Num { constructor(raw) { this.raw = raw; this.n = Number(raw); } }
+
+// Minimal JSON parser that keeps each number's original text (so 5.0 stays "5.0", as Python prints it).
+function parseKeep(text) {
+  let i = 0;
+  const numRe = /-?\d+(\.\d+)?([eE][+-]?\d+)?/y;
+  const ws = () => { while (i < text.length && /\s/.test(text[i])) i++; };
+  function str() {
+    let j = i + 1;
+    while (text[j] !== '"') { if (text[j] === "\\") j++; j++; }
+    const tok = text.slice(i, j + 1); i = j + 1; return JSON.parse(tok);
+  }
+  function val() {
+    ws();
+    const c = text[i];
+    if (c === "{") {
+      i++; const o = {}; ws();
+      if (text[i] === "}") { i++; return o; }
+      for (;;) { ws(); const k = str(); ws(); i++; o[k] = val(); ws(); if (text[i++] === ",") continue; return o; }
+    }
+    if (c === "[") {
+      i++; const a = []; ws();
+      if (text[i] === "]") { i++; return a; }
+      for (;;) { a.push(val()); ws(); if (text[i++] === ",") continue; return a; }
+    }
+    if (c === '"') return str();
+    if (text.startsWith("true", i)) { i += 4; return true; }
+    if (text.startsWith("false", i)) { i += 5; return false; }
+    if (text.startsWith("null", i)) { i += 4; return null; }
+    numRe.lastIndex = i;
+    const m = numRe.exec(text);
+    if (!m) throw new Error("Bad JSON from node");
+    i += m[0].length; return new Num(m[0]);
+  }
+  return val();
+}
+
+const plain = v => v instanceof Num ? v.n : Array.isArray(v) ? v.map(plain)
+  : (v && typeof v === "object") ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, plain(x)])) : v;
+const cloneRaw = v => v instanceof Num ? new Num(v.raw) : Array.isArray(v) ? v.map(cloneRaw)
+  : (v && typeof v === "object") ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, cloneRaw(x)])) : v;
+
+function pyStr(s) {
+  let o = '"';
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i], c = s.charCodeAt(i);
+    if (ch === '"') o += '\\"'; else if (ch === "\\") o += "\\\\";
+    else if (ch === "\n") o += "\\n"; else if (ch === "\r") o += "\\r"; else if (ch === "\t") o += "\\t";
+    else if (ch === "\b") o += "\\b"; else if (ch === "\f") o += "\\f";
+    else if (c < 0x20 || c > 0x7e) o += "\\u" + c.toString(16).padStart(4, "0");
+    else o += ch;
+  }
+  return o + '"';
+}
+function pyDumps(v) {
+  if (v instanceof Num) return v.raw;
+  if (typeof v === "string") return pyStr(v);
+  if (v === true) return "true"; if (v === false) return "false"; if (v === null) return "null";
+  if (Array.isArray(v)) return "[" + v.map(pyDumps).join(", ") + "]";
+  return "{" + Object.keys(v).sort().map(k => pyStr(k) + ": " + pyDumps(v[k])).join(", ") + "}";
+}
+
+/* ---------- SHA-256 (pure JS, works on file:// too) ---------- */
+const SHA = (() => {
+  const K = [], H0 = [];
+  const isPrime = n => { for (let i = 2; i * i <= n; i++) if (n % i === 0) return false; return true; };
+  for (let n = 2, c = 0; c < 64; n++) if (isPrime(n)) {
+    if (c < 8) H0[c] = (Math.sqrt(n) % 1 * 2 ** 32) >>> 0;
+    K[c] = (Math.cbrt(n) % 1 * 2 ** 32) >>> 0; c++;
+  }
+  const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+  return str => {
+    const bytes = []; for (let i = 0; i < str.length; i++) bytes.push(str.charCodeAt(i) & 255);   // input is pure ASCII
+    const bitLen = bytes.length * 8;
+    bytes.push(0x80); while (bytes.length % 64 !== 56) bytes.push(0);
+    const hi = Math.floor(bitLen / 2 ** 32), lo = bitLen >>> 0;
+    for (let s = 24; s >= 0; s -= 8) bytes.push((hi >>> s) & 255);
+    for (let s = 24; s >= 0; s -= 8) bytes.push((lo >>> s) & 255);
+    const h = H0.slice(), w = new Array(64);
+    for (let off = 0; off < bytes.length; off += 64) {
+      for (let i = 0; i < 16; i++) w[i] = (bytes[off+4*i] << 24) | (bytes[off+4*i+1] << 16) | (bytes[off+4*i+2] << 8) | bytes[off+4*i+3];
+      for (let i = 16; i < 64; i++) {
+        const s0 = rotr(w[i-15], 7) ^ rotr(w[i-15], 18) ^ (w[i-15] >>> 3);
+        const s1 = rotr(w[i-2], 17) ^ rotr(w[i-2], 19) ^ (w[i-2] >>> 10);
+        w[i] = (w[i-16] + s0 + w[i-7] + s1) | 0;
+      }
+      let [a, b, c, d, e, f, g, hh] = h;
+      for (let i = 0; i < 64; i++) {
+        const t1 = (hh + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) | 0;
+        const t2 = ((rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+        hh = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      [a, b, c, d, e, f, g, hh].forEach((x, i) => h[i] = (h[i] + x) | 0);
+    }
+    return h.map(x => (x >>> 0).toString(16).padStart(8, "0")).join("");
+  };
+})();
+
+/* ---------- chain analysis (same rules as your Python file) ---------- */
+const GENESIS = '{"index": 1, "nonce": 0, "previous_hash": "0", "timestamp": 0, "transactions": []}';
+function buildReport(rawChain) {
+  const hashes = rawChain.map(b => SHA(pyDumps(b)));
+  const zeros = "0".repeat(cfg.difficulty);
+  return rawChain.map((b, i) => {
+    const link_ok = i === 0 ? pyDumps(b) === GENESIS : plain(b).previous_hash === hashes[i - 1];
+    const pow_ok = i === 0 ? true : hashes[i].startsWith(zeros);
+    return { ...plain(b), hash: hashes[i], link_ok, pow_ok, valid: link_ok && pow_ok };
+  });
+}
+function computeBalances(groups) {
+  const bal = {};
+  for (const txs of groups) for (const t of txs) {
+    if (t.sender !== "NETWORK") bal[t.sender] = (bal[t.sender] || 0) - t.amount;
+    bal[t.recipient] = (bal[t.recipient] || 0) + t.amount;
+  }
+  return bal;
+}
+function pruneSubmitted(blocks) {
+  const seen = {};
+  const key = t => JSON.stringify([t.sender, t.recipient, t.amount]);
+  for (const b of blocks) for (const t of b.transactions) if (t.sender !== "NETWORK") seen[key(t)] = (seen[key(t)] || 0) + 1;
+  submitted = submitted.filter(t => seen[key(t)] > 0 ? (seen[key(t)]--, false) : true);
+}
+
+/* ---------- talking to your node ---------- */
+async function nodeFetch(path, opts) {
+  let r;
+  try { r = await fetch(cfg.node + path, opts); }
+  catch { throw new Error(`Cannot reach ${cfg.node}. Is your node running, and is the CORS line added?`); }
+  const text = await r.text();
+  let data = {}; try { data = JSON.parse(text); } catch {}
+  if (!r.ok) throw new Error(data.error || r.statusText);
+  return { text, data };
+}
+const nodePost = (path, body) => nodeFetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+async function loadState() {
+  const { text } = await nodeFetch("/chain");
+  const raw = parseKeep(text).chain;
+  const blocks = buildReport(raw);
+  pruneSubmitted(blocks);
+  let miner = null;
+  for (let i = blocks.length - 1; i >= 0 && !miner; i--)
+    for (const t of blocks[i].transactions) if (t.sender === "NETWORK") { miner = t.recipient; break; }
+  state = {
+    node_url: cfg.node, difficulty: cfg.difficulty, valid: blocks.every(b => b.valid), mining, miner,
+    blocks, raw, pending: submitted, balances: computeBalances(blocks.map(b => b.transactions)), nodes: [...peers].sort(),
+  };
+}
+
+/* ---------- rendering ---------- */
+function render() {
+  const s = state;
+  $("nodeid").textContent = "node " + s.node_url;
+  $("zeros").textContent = "0".repeat(s.difficulty) + "…";
+  $("sBlocks").textContent = blocksNow().length;
+  $("sPending").textContent = s.pending.length;
+  $("sDiff").textContent = s.difficulty;
+  $("sPeers").textContent = s.nodes.length;
+  $("sTime").textContent = lastMineTime == null ? "–" : lastMineTime + "s";
+  $("chainCount").textContent = "· " + blocksNow().length;
+  $("pendCount").textContent = s.pending.length ? "· " + s.pending.length : "";
+
+  const st = $("status");
+  const ok = sim ? sim.valid : s.valid;
+  st.classList.toggle("bad", !ok);
+  $("statusText").textContent = sim ? (ok ? "Simulation: chain valid" : "Simulation: tampering detected")
+    : s.mining ? "Mining…" : (ok ? "Chain valid" : "Chain INVALID");
+  $("simBanner").style.display = sim ? "flex" : "none";
+
+  renderChain();
+  renderPending();
+  renderBalances();
+  renderNodes();
+  renderTamper();
+  renderDetail();
+}
+
+function renderChain() {
+  const el = $("chain");
+  const keepScroll = el.scrollLeft;
+  const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 40;
+  const blocks = blocksNow();
+  let html = "";
+  blocks.forEach((b, i) => {
+    if (i > 0) html += `<div class="link ${b.link_ok ? "" : "broken"}"></div>`;
+    const isNew = i >= knownCount && knownCount > 0;
+    html += `
+      <div class="block ${b.valid ? "" : "invalid"} ${selected === b.index ? "selected" : ""} ${isNew ? "new" : ""}" data-i="${i}">
+        <div class="num">#${b.index}<span class="badge ${b.valid ? "ok" : "no"}">${b.valid ? "VALID" : "BROKEN"}</span></div>
+        <div class="row"><span>time</span><b>${fmtTime(b.timestamp)}</b></div>
+        <div class="row"><span>txs</span><b>${b.transactions.length}</b></div>
+        <div class="row"><span>nonce</span><b>${b.nonce.toLocaleString()}</b></div>
+        <div class="hashbar" style="background:linear-gradient(90deg, ${colorOf(b.hash)}, ${colorOf(b.hash.slice(8))}, ${colorOf(b.hash.slice(16))})"></div>
+        <div class="short">${short(b.hash)}</div>
+      </div>`;
+  });
+  el.innerHTML = html;
+  el.scrollLeft = (atEnd && blocks.length > knownCount) ? el.scrollWidth : keepScroll;
+  knownCount = blocks.length;
+
+  el.querySelectorAll(".block").forEach(node => {
+    const b = blocks[+node.dataset.i];
+    node.addEventListener("mouseenter", e => showTip(b, node));
+    node.addEventListener("mousemove", e => moveTip(e));
+    node.addEventListener("mouseleave", hideTip);
+    node.addEventListener("click", () => { selected = b.index; render(); });
+  });
+}
+
+function renderPending() {
+  const p = state.pending;
+  $("pending").innerHTML = p.length ? p.map(t => `
+    <div class="tx"><span class="who">${esc(short(t.sender, 10))} → ${esc(short(t.recipient, 10))}</span><span class="amt">${fmtAmt(t.amount)}</span></div>`).join("")
+    : `<div class="empty">Nothing waiting. Transactions sent from this page show here until mined.</div>`;
+}
+
+function renderBalances() {
+  const entries = Object.entries(state.balances).sort((a, b) => b[1] - a[1]);
+  const max = Math.max(1, ...entries.map(e => Math.abs(e[1])));
+  $("balances").innerHTML = entries.length ? entries.map(([k, v]) => `
+    <div>
+      <div class="bal"><span class="name">${esc(short(k, 10))}${k === state.miner ? ' <span class="me-tag">miner</span>' : ""}</span><b>${fmtAmt(v)}</b></div>
+      <div class="bar"><i style="width:${Math.max(2, Math.abs(v) / max * 100)}%"></i></div>
+    </div>`).join("") : `<div class="empty">No balances yet. Mine a block to earn the first coin.</div>`;
+}
+
+function renderNodes() {
+  $("nodes").innerHTML = state.nodes.length ? state.nodes.map(n => `<li>● ${esc(n)}</li>`).join("") : `<li>No peers registered.</li>`;
+}
+
+function renderTamper() {
+  const sel = $("tamperSel");
+  const cur = sel.value;
+  sel.innerHTML = state.blocks.map(b => `<option value="${b.index}">Block #${b.index}</option>`).join("");
+  if (cur && sel.querySelector(`option[value="${cur}"]`)) sel.value = cur;
+}
+
+function renderDetail() {
+  const b = blocksNow().find(x => x.index === selected);
+  if (!b) return;
+  $("detail").innerHTML = `
+    <div class="kv">
+      <div class="k">Index</div><div class="v">${b.index}</div>
+      <div class="k">Timestamp</div><div class="v">${b.timestamp ? new Date(b.timestamp * 1000).toLocaleString() : "genesis (0)"}</div>
+      <div class="k">Nonce</div><div class="v">${b.nonce.toLocaleString()}</div>
+      <div class="k">Hash</div><div class="v copy" data-copy="${b.hash}" title="Click to copy">${b.hash}</div>
+      <div class="k">Previous</div><div class="v copy" data-copy="${b.previous_hash}" title="Click to copy">${b.previous_hash}</div>
+      <div class="k">Link check</div><div class="v" style="color:var(${b.link_ok ? "--good" : "--bad"})">${b.link_ok ? "matches previous block's hash" : "DOES NOT match previous block"}</div>
+      <div class="k">Proof of work</div><div class="v" style="color:var(${b.pow_ok ? "--good" : "--bad"})">${b.pow_ok ? "meets difficulty" : "hash lacks leading zeros"}</div>
+    </div>
+    <pre>${esc(JSON.stringify(b.transactions, null, 2))}</pre>`;
+  $("detail").querySelectorAll("[data-copy]").forEach(n => n.addEventListener("click", () => {
+    navigator.clipboard?.writeText(n.dataset.copy).then(() => toast("Hash copied"), () => toast("Copy failed", true));
+  }));
+}
+
+/* ---------- tooltip ---------- */
+const tip = $("tip");
+function showTip(b, node) {
+  const z = state.difficulty;
+  const hashHtml = `<span class="z">${b.hash.slice(0, z)}</span>${b.hash.slice(z)}`;
+  tip.innerHTML = `
+    <div class="t">Block #${b.index} ${b.valid ? "" : "<span style='color:var(--bad)'>· BROKEN</span>"}</div>
+    <div class="l">Hash</div><div class="h">${hashHtml}</div>
+    <div class="l">Previous hash</div><div class="h">${b.previous_hash}</div>
+    <div class="l">Nonce · Transactions</div><div class="h">${b.nonce.toLocaleString()} · ${b.transactions.length}</div>`;
+  tip.classList.add("show");
+}
+function moveTip(e) {
+  const w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = e.clientX + 18, y = e.clientY + 18;
+  if (x + w > innerWidth - 10) x = e.clientX - w - 18;
+  if (y + h > innerHeight - 10) y = e.clientY - h - 18;
+  tip.style.left = x + "px"; tip.style.top = y + "px";
+}
+function hideTip() { tip.classList.remove("show"); }
+
+/* ---------- actions ---------- */
+async function refresh() {
+  try {
+    await loadState();
+    if (selected === null) selected = state.blocks[state.blocks.length - 1].index;
+    render();
+  } catch (e) {
+    $("status").classList.add("bad");
+    $("statusText").textContent = e.message.length > 60 ? "Node unreachable" : e.message;
+    $("statusText").title = e.message;
+  }
+}
+
+$("mineBtn").addEventListener("click", async () => {
+  const btn = $("mineBtn");
+  btn.disabled = true; mining = true;
+  btn.innerHTML = `<span class="spin"></span>Mining…`;
+  const started = performance.now();
+  try {
+    const { data } = await nodeFetch("/mine");
+    lastMineTime = +((performance.now() - started) / 1000).toFixed(2);
+    selected = data.index;
+    toast(`Block #${data.index} mined in ${lastMineTime}s (nonce ${data.nonce.toLocaleString()})`);
+  } catch (e) { toast(e.message, true); }
+  mining = false; btn.disabled = false; btn.innerHTML = "⛏ Mine a new block";
+  refresh();
+});
+
+$("txForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const sender = $("txSender").value.trim(), recipient = $("txRecipient").value.trim(), amount = parseFloat($("txAmount").value);
+  try {
+    if (!sender || !recipient) throw new Error("Sender and recipient are required");
+    if (sender === "NETWORK") throw new Error("NETWORK is reserved for mining rewards");
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error("Amount must be a number greater than zero");
+    if ($("txEnforce").checked) {
+      await loadState();
+      const have = computeBalances([...state.blocks.map(b => b.transactions), submitted])[sender] || 0;
+      if (have < amount) throw new Error(`Insufficient funds: sender has ${fmtAmt(have)}`);
+    }
+    const { data } = await nodePost("/transactions/new", { sender, recipient, amount });
+    submitted.push({ sender, recipient, amount });
+    toast(data.message || "Transaction sent");
+    $("txAmount").value = "";
+  } catch (err) { toast(err.message, true); }
+  refresh();
+});
+
+$("useMe").addEventListener("click", () => {
+  if (state && state.miner) $("txSender").value = state.miner; else toast("Mine a block first so the miner has an address", true);
+});
+
+$("nodeForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  try {
+    const url = $("nodeUrl").value.trim();
+    if (!url) throw new Error("Enter a peer URL");
+    const { data } = await nodePost("/nodes/register", { nodes: [url] });
+    (data.all_nodes || []).forEach(n => peers.add(n));
+    toast("Peer added"); $("nodeUrl").value = "";
+  } catch (err) { toast(err.message, true); }
+  refresh();
+});
+
+$("resolveBtn").addEventListener("click", async () => {
+  try { toast((await nodeFetch("/nodes/resolve")).data.message); } catch (e) { toast(e.message, true); }
+  refresh();
+});
+
+// Tamper simulator: edits an in-memory COPY only. Nothing is sent to the node.
+$("tamperBtn").addEventListener("click", () => {
+  const index = +$("tamperSel").value;
+  const copy = cloneRaw(state.raw), b = copy[index - 1];
+  if (b.transactions.length) { const t = b.transactions[0]; t.amount = new Num(String(t.amount.n + 100)); }
+  else b.nonce = new Num(String(b.nonce.n + 1));
+  const blocks = buildReport(copy);
+  sim = { blocks, valid: blocks.every(x => x.valid) };
+  selected = index;
+  toast("Simulating tampering. Your real chain is untouched.");
+  render();
+});
+$("exitSim").addEventListener("click", () => { sim = null; render(); });
+$("jumpEnd").addEventListener("click", () => { $("chain").scrollLeft = $("chain").scrollWidth; });
+
+$("cfgNode").value = cfg.node; $("cfgDiff").value = cfg.difficulty;
+$("cfgNode").addEventListener("change", () => {
+  cfg.node = $("cfgNode").value.trim().replace(/\/+$/, ""); LS.set("node", cfg.node);
+  submitted = []; selected = null; knownCount = 0; sim = null; refresh();
+});
+$("cfgDiff").addEventListener("change", () => {
+  cfg.difficulty = Math.max(1, +$("cfgDiff").value || 4); LS.set("difficulty", cfg.difficulty); sim = null; refresh();
+});
+
+refresh();
+setInterval(refresh, 2500);
+</script>
+</body>
+</html>
